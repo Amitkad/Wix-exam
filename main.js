@@ -9,8 +9,8 @@ smartSass(["./src/**/*"],"./dest");
 
 
 function smartSass(sourcePatterns, targetDirectoryRoot){
-    var filesWhichNeedSass = []; //returned value
-    var filesWhichNeedSassUniqe = {}; // an object will hold uniqe paths
+
+    var filesWhichNeedSassUniq = {}; // an object will hold unique paths
     var importsMap = {};// an object with : filepath : [dependencies]
     var sourceFiles = []; //an array of all files in sourcePatterns
     var changedPartials = []; //
@@ -25,21 +25,22 @@ function smartSass(sourcePatterns, targetDirectoryRoot){
         sourceFiles= sourceFiles.concat(mg.found);
     }
     // console.log(importsMap);
-    addfilesBeenChanged(sourceFiles,targetDirectoryRoot,changedPartials,filesWhichNeedSass); // add all files where (src.modified>dest.created) to fileWhichNeedSass
+    addfilesBeenChanged(sourceFiles,targetDirectoryRoot,changedPartials,filesWhichNeedSassUniq); // add all files where (src.modified>dest.created) to fileWhichNeedSass
+    // console.log(filesWhichNeedSassUniq["./src/3/bla3.sass"])
     addDependecies(importsMap,sourceFiles); //add add all imports to a map of <filename, [array of dependencied]>
     // console.log(importsMap["./src/1/bla1.sass"]);
     var filesCheckList = makeOrder(importsMap);
-    addDepended(filesCheckList,importsMap,filesWhichNeedSass); // concats files already found with the files in importsMap whom are depended in these files
+    addDepended(filesCheckList,importsMap,filesWhichNeedSassUniq); // concats files already found with the files in importsMap whom are depended in these files
 
-    console.log(filesCheckList);
+    // console.log(filesCheckList);
     // console.log(importsMap[sourceFiles[2]]);
-    // console.log(filesWhichNeedSass);
+
+    var filesWhichNeedSass = Object.keys(filesWhichNeedSassUniq); //returned value
+    console.log(filesWhichNeedSass);
    return filesWhichNeedSass;
 }
 //TODO check if works on all types of concat of path ("./src" "/src", "C:/" etc.). wait for email from yaniv
-function addfilesBeenChanged(sourceFiles, targetDirectoryRoot,changedPartials, filesWhichNeedSass) {
-
-
+function addfilesBeenChanged(sourceFiles, targetDirectoryRoot,changedPartials, filesWhichNeedSassUniq) {
     //for (file in sourceFiles)
     for (var i = 0, len = sourceFiles.length; i < len; i++) {
         var srcStr = sourceFiles[i];
@@ -55,20 +56,16 @@ function addfilesBeenChanged(sourceFiles, targetDirectoryRoot,changedPartials, f
         }
         try {
             var statDest= fs.statSync(destStr);
-            //  if (src.modified>dest.created)
-            if (statSrc.mtime>statDest.birthtime){
-
-                filesWhichNeedSass.push(srcStr);
+            if (statSrc.mtime>statDest.birthtime){ //  if (src.modified>dest.created)
+                filesWhichNeedSassUniq[srcStr]=1;// filesWhichNeedSass.push(srcStr);
             }
         }
         catch(err) {
             //if dest file does not exist then recompile
             console.log("stat error: " + err);
-            filesWhichNeedSass.push(srcStr);
+            filesWhichNeedSassUniq[srcStr]=1;//filesWhichNeedSass.push(srcStr);
         }
     }
-
-
 
 }
 
@@ -81,6 +78,9 @@ function addDependecies(importsMap,sourceFiles) {
         // var fileImports = fileStr.split(/@import|[\s\,\;]+/igm).filter(Boolean); //TODO doesnt work + //TODO join path's of filepath and imports
         for (var j = 0, importsLen = fileImports.length; j < importsLen; j++) {
             importsMap[filePath].push(fileImports[j]);//concat(fileImports);
+        }
+        if (fileImports.length==0){
+            importsMap[filePath]=[];
         }
     }
 }
@@ -110,14 +110,21 @@ function makeOrder(graph) {
     return sorted;
 }
 
-function addDepended(filesCheckList,importsMap,filesWhichNeedSass) {
+function addDepended(filesCheckList,importsMap,filesWhichNeedSassUniq) {
     for (var i = 0, l; i < filesCheckList.length; i++) {
         var importsArr = importsMap[filesCheckList[i]];
         for (var j = 0, l; j < importsArr.length; j++) {
-            if (path.basename(importsArr[j]).charAt[0]=='_'){ //if file name begins with '_' => compile
-                filesCheckList[i]
-
+            var filePath = importsArr[j];
+            if (path.basename(filePath).charAt[0]=='_'){ //if file name begins with '_' => compile file
+                filesWhichNeedSassUniq[filesCheckList[i]]=1;
+            }else{
+                // var isExist = typeof filesWhichNeedSassUniq[filePath];
+                // console.log(filesWhichNeedSassUniq)
+                if (filePath in filesWhichNeedSassUniq){// if a dependency needs to rebuild = > compile file
+                    filesWhichNeedSassUniq[filesCheckList[i]]=1;
+                }
             }
+
         }
     }
 
